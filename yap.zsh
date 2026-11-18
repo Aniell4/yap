@@ -15,6 +15,7 @@ Reply with exactly two parts:
 2. a blank line
 3. one or two sentences: what it does, and any risk (destructive, needs sudo, network)
 Only use commands that are actually installed on this system; the shell flags unknown ones.
+Time windows on history tools (`sar`, `sadf`: `-s`/`-e`) are HH:MM:SS only and print nothing at all when the window starts on the previous day; prefer the whole day, or make the window conditional.
 If the command depends on something that may not be set up yet (a daemon, a collecting service, a database, a package), say so in the explanation.
 If the request is ambiguous, pick the most standard interpretation. Never ask questions.'
 
@@ -207,7 +208,8 @@ yap() {
         fi
         rehash
       fi
-      eval -- "$YAP_CMD" ;;
+      eval -- "$YAP_CMD"
+      printf '\e[2m[exit %d]\e[0m\n' $? ;;
     copy)
       if _yap_copy "$YAP_CMD"; then
         printf '\e[2mcopied\e[0m\n'
