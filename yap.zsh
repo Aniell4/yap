@@ -16,7 +16,7 @@ Reply with exactly two parts:
 3. one or two sentences: what it does, and any risk (destructive, needs sudo, network)
 Only use commands that are actually installed on this system; the shell flags unknown ones.
 `sadf -g` already emits SVG and takes no format argument (`sadf -g -- -u`, not `sadf -g svg -- -u`).
-If the command writes a file the user will want to look at (graph, image, report), end it with opening that file (`xdg-open FILE`).
+When the command writes a graph or image (`>`/`-o`), just write it to disk: yap displays images itself.
 Time windows on history tools (`sar`, `sadf`: `-s`/`-e`) are HH:MM:SS only and print nothing at all when the window starts on the previous day; prefer the whole day, or make the window conditional.
 If the command depends on something that may not be set up yet (a daemon, a collecting service, a database, a package), say so in the explanation.
 If the request is ambiguous, pick the most standard interpretation. Never ask questions.'
@@ -199,6 +199,37 @@ _yap_stamp() {
   print -r -- "${st[1]}:${sz[1]}"
 }
 
+# show files a run produced: inline in kitty, otherwise in the desktop viewer
+_yap_reveal() {
+  local f px tmp
+  local -i W H
+  for f in "$@"; do
+    case $f in
+      (*.(png|jpg|jpeg|gif|webp|bmp|svg)) ;;
+      (*) continue ;;
+    esac
+    if [[ -n $KITTY_WINDOW_ID || $TERM == xterm-kitty ]] && (( ${+commands[kitten]} )); then
+      # icat exits 0 even when it cannot decode (svg): rasterize, trim padding, fit the window
+      if (( ${+commands[convert]} )); then
+        px=$(kitten icat --print-window-size 2>/dev/null)
+        W=${px%%x*} H=${px##*x}
+        (( W > 0 && H > 0 )) || { W=1200 H=800 }
+        tmp=${TMPDIR:-/tmp}/yap-reveal.$$.png
+        if convert "$f" -trim +repage -resize "${W}x$(( H * 7 / 10 ))>" "$tmp" 2>/dev/null; then
+          kitten icat --align=left "$tmp"
+          rm -f "$tmp"
+          continue
+        fi
+        rm -f "$tmp"
+      elif [[ $f != *.svg ]]; then
+        kitten icat --align=left "$f"
+        continue
+      fi
+    fi
+    (( ${+commands[xdg-open]} )) && xdg-open "$f" >/dev/null 2>&1 &!
+  done
+}
+
 _yap_copy() {
   if (( $+commands[wl-copy] )); then print -rn -- "$1" | wl-copy
   elif (( $+commands[xclip] )); then print -rn -- "$1" | xclip -selection clipboard
@@ -236,16 +267,26 @@ yap() {
         rehash
       fi
       local f tilde='~'
-      local -a tg wrote
-      local -A before
+      local -a tg before_imgs wrote
+      local -A before ibefore
+      setopt localoptions nullglob
       tg=( ${(f)"$(_yap_targets "$YAP_CMD")"} )
       for f in $tg; before[$f]=$(_yap_stamp "$f")
+      before_imgs=( *.(png|jpg|jpeg|gif|webp|bmp|svg) )
+      for f in $before_imgs; ibefore[$f]=$(_yap_stamp "$f")
       eval -- "$YAP_CMD"
       rc=$?
       for f in $tg; do
-        [[ -f $f && $(_yap_stamp "$f") != ${before[$f]} ]] && wrote+=( "${f/#$HOME/$tilde}" )
+        [[ -f $f && $(_yap_stamp "$f") != ${before[$f]} ]] && wrote+=( "$f" )
       done
-      printf '\e[2m[exit %d]%s\e[0m\n' $rc "${wrote:+ wrote ${(j:, :)${(u)wrote}}}" ;;
+      for f in *.(png|jpg|jpeg|gif|webp|bmp|svg); do
+        [[ -f $f ]] || continue
+        [[ -n ${ibefore[$f]} && $(_yap_stamp "$f") == ${ibefore[$f]} ]] && continue
+        wrote+=( "$PWD/$f" )
+      done
+      local -a shown=( ${wrote[@]/#$HOME/$tilde} )
+      printf '\e[2m[exit %d]%s\e[0m\n' $rc "${shown:+ wrote ${(j:, :)${(u)shown}}}"
+      (( ${#wrote} )) && _yap_reveal "${wrote[@]}" ;;
     copy)
       if _yap_copy "$YAP_CMD"; then
         printf '\e[2mcopied\e[0m\n'

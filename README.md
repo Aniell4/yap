@@ -33,6 +33,7 @@ lsof -tiTCP:5283 -sTCP:LISTEN | xargs -r kill
 - zsh
 - [omp](https://omp.sh) configured with at least one model (`yap` drives `omp -p`)
 - optional: `xclip`/`wl-copy`/`xsel` for `[c]`, `command-not-found` or `brew` for `[r]`-installs
+- optional: kitty + ImageMagick to see generated images inline; without kitty they open in your default viewer
 
 ## Install
 
@@ -63,6 +64,10 @@ Set before the `source` line (or `export` from your shell):
 | `YAP_KEY` | `^X^A` | the widget binding |
 | `YAP_BACKEND` | `omp` | binary to call |
 | `YAP_CFG` | `~/.config/omp/agent/config.yml` | where the default model is read from |
+
+## Output
+
+Files a run writes are listed after it (`[exit 0] wrote ~/cpu.svg`). Images are shown inline when you're in kitty — trimmed of padding and fitted to the window — and handed to `xdg-open` anywhere else. Non-image files are just named.
 
 ## Missing tools
 
