@@ -16,6 +16,7 @@ Reply with exactly two parts:
 3. one or two sentences: what it does, and any risk (destructive, needs sudo, network)
 Only use commands that are actually installed on this system; the shell flags unknown ones.
 `sadf -g` already emits SVG and takes no format argument (`sadf -g -- -u`, not `sadf -g svg -- -u`).
+If the command writes a file the user will want to look at (graph, image, report), end it with opening that file (`xdg-open FILE`).
 Time windows on history tools (`sar`, `sadf`: `-s`/`-e`) are HH:MM:SS only and print nothing at all when the window starts on the previous day; prefer the whole day, or make the window conditional.
 If the command depends on something that may not be set up yet (a daemon, a collecting service, a database, a package), say so in the explanation.
 If the request is ambiguous, pick the most standard interpretation. Never ask questions.'
@@ -173,6 +174,31 @@ _yap_installer() {
   return 1
 }
 
+# files the command redirects its output into (plain words only)
+_yap_targets() {
+  emulate -L zsh
+  local -a t=( ${(z)1} )
+  local i f
+  for (( i = 1; i < ${#t}; i++ )); do
+    [[ $t[i] == ('>'|'>>'|'>|'|'&>') ]] || continue
+    f=${(Q)t[i+1]}
+    [[ $f == *'$'* || $f == *'`'* ]] && continue
+    f=${f/#\~/$HOME}
+    [[ $f == /* ]] || f=$PWD/$f
+    print -r -- "$f"
+  done
+}
+
+# mtime+size of a file, or nothing when it does not exist
+_yap_stamp() {
+  zmodload -F zsh/stat b:zstat 2>/dev/null
+  local -a st
+  zstat -A st +mtime -- "$1" 2>/dev/null || return 0
+  local -a sz
+  zstat -A sz +size -- "$1" 2>/dev/null
+  print -r -- "${st[1]}:${sz[1]}"
+}
+
 _yap_copy() {
   if (( $+commands[wl-copy] )); then print -rn -- "$1" | wl-copy
   elif (( $+commands[xclip] )); then print -rn -- "$1" | xclip -selection clipboard
@@ -209,8 +235,17 @@ yap() {
         fi
         rehash
       fi
+      local f tilde='~'
+      local -a tg wrote
+      local -A before
+      tg=( ${(f)"$(_yap_targets "$YAP_CMD")"} )
+      for f in $tg; before[$f]=$(_yap_stamp "$f")
       eval -- "$YAP_CMD"
-      printf '\e[2m[exit %d]\e[0m\n' $? ;;
+      rc=$?
+      for f in $tg; do
+        [[ -f $f && $(_yap_stamp "$f") != ${before[$f]} ]] && wrote+=( "${f/#$HOME/$tilde}" )
+      done
+      printf '\e[2m[exit %d]%s\e[0m\n' $rc "${wrote:+ wrote ${(j:, :)${(u)wrote}}}" ;;
     copy)
       if _yap_copy "$YAP_CMD"; then
         printf '\e[2mcopied\e[0m\n'
