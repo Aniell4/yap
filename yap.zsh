@@ -284,8 +284,9 @@ yap() {
         [[ -n ${ibefore[$f]} && $(_yap_stamp "$f") == ${ibefore[$f]} ]] && continue
         wrote+=( "$PWD/$f" )
       done
+      wrote=( ${(@u)wrote} )
       local -a shown=( ${wrote[@]/#$HOME/$tilde} )
-      printf '\e[2m[exit %d]%s\e[0m\n' $rc "${shown:+ wrote ${(j:, :)${(u)shown}}}"
+      printf '\e[2m[exit %d]%s\e[0m\n' $rc "${shown:+ wrote ${(j:, :)shown}}"
       (( ${#wrote} )) && _yap_reveal "${wrote[@]}" ;;
     copy)
       if _yap_copy "$YAP_CMD"; then
