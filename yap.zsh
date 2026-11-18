@@ -15,6 +15,7 @@ Reply with exactly two parts:
 2. a blank line
 3. one or two sentences: what it does, and any risk (destructive, needs sudo, network)
 Only use commands that are actually installed on this system; the shell flags unknown ones.
+If the command depends on something that may not be set up yet (a daemon, a collecting service, a database, a package), say so in the explanation.
 If the request is ambiguous, pick the most standard interpretation. Never ask questions.'
 
 # the model omp is configured to use, unless overridden (empty = let omp decide)
